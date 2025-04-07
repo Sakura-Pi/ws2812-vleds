@@ -58,11 +58,11 @@ In theory, the spi output speed is 6400000Hz. But in some cases (eg. level shift
 ```
 
 We use 8 bits to represent one ws2812 color bit(0 code and 1 code), which can cause 8 times memory usage. So the general formula in hz:
-```tex
+
 $$
 freq = (\frac{1}{1.25 us / 1000000}) * 8
 $$
-```
+
 
 To calibrate the spi output speed, we need a 50% width pulse which is `0b11110000`, increase or decrease the output speed, measure the valid voltage time of the high pulse (>= 3v [^note1]) is close to 0.625us.
 
