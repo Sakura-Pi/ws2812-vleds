@@ -64,15 +64,14 @@ struct color24* dst, uint8_t lightness)
   if (!src || !dst) return;
   int h, s, l;
     
-  // Convert rgb to hsl
+  // convert rgb to hsl
   rgb_to_hsl(src->r, src->g, src->b, &h, &s, &l);
   
   // agjust the lightness
-  // l = (int)(l * (lightness/255.0));
-  // if (l > 255) l = 255;
-  
+  l = (l * lightness / 255);
+
   // convert back to rgb
-  hsl_to_rgb(h, s, lightness, &dst->r, &dst->g, &dst->b);
+  hsl_to_rgb(h, s, l, &dst->r, &dst->g, &dst->b);
 }
 
 static int ws2812_vleds_get_lednum(struct device_node* node) {
@@ -109,25 +108,17 @@ static int w2812_lveds_set_brightness(struct led_classdev* led, enum led_brightn
     }
   }
 
-  pr_info("enum %p\n", led);
-  pr_info("_ledcls->dev = %p\n", led->dev);
-  pr_info("dev_get_drvdata = %p\n", dev_get_drvdata(led->dev));
-  pr_info("dev_get_drvdata(_ledcls->dev->parent) = %p\n", dev_get_drvdata(led->dev->parent));
-
   int _index = 0, _ret = 0;
   struct wsled_data* _node;
 
   list_for_each_entry(_node, &_drv_data->leds, list) {
 
-    pr_info("%p vs %p\n", _node->cls, led);
-
     // set brightness
     if(_node->cls == led) {
-      pr_info("set wsled %p to %d\n", _node->cls, bright);
       
       _node->lightness = bright;
-      __set_lightness_color24(&_node->origin_color, &_node->color, bright);
-      pr_info("set brightness r%d g%d b%d \n",_node->color.r, _node->color.g, _node->color.b);
+      __set_lightness_color24(&_node->origin_color, &_node->color, _node->lightness);
+      dev_info(led->dev, "set brightness %d: r%d g%d b%d \n", bright, _node->color.r, _node->color.g, _node->color.b);
 
       ws2812_set_pixel(_drv_data->ws_opctx, _index, ws2812_rgb(
         _node->color.r,
@@ -188,7 +179,6 @@ static int ws2812_vleds_probe(struct spi_device *spi)
 
   // clear leds
   ws2812_vleds_update(_drv_data);
-  // dev_info(&spi->dev, "preparing vled\n");
 
   int _index = 0;
   struct device_node *_enrty, *child;
@@ -208,9 +198,15 @@ static int ws2812_vleds_probe(struct spi_device *spi)
         dev_warn(&spi->dev, "unamed led, fallback to %s\n", _label);
       }
 
+      // max brightness
+      int _max_brightness;
+      if (of_property_read_s32(child, "max_brightness", &_max_brightness)) {
+        _max_brightness = 255; // fallback to 255
+      }
+
       _ledcls->name = _label;
       _ledcls->brightness_set_blocking = w2812_lveds_set_brightness;
-      _ledcls->max_brightness = 255;
+      _ledcls->max_brightness = _max_brightness;
       _ledcls->dev = &spi->dev;
 
       led_classdev_register(&spi->dev, _ledcls);
@@ -242,8 +238,9 @@ static int ws2812_vleds_probe(struct spi_device *spi)
       _ledctx->origin_color.b = _color_b;
       _ledctx->lightness = 255;
       __set_lightness_color24(&_ledctx->origin_color, &_ledctx->color, _ledctx->lightness);
-      list_add_tail(&_ledctx->list, &_drv_data->leds);
     }
+
+    list_add_tail(&_ledctx->list, &_drv_data->leds);
   }
 
   return 0;

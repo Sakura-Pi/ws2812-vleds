@@ -4,6 +4,7 @@
 #include <linux/string.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
+
 /**
 * convert 8bits hex string into int8
 * @param c char
