@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
+// Copyright (c) 2025 Sakura Pi Org <kernel@sakurapi.org>
+
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/device.h>
@@ -22,7 +25,7 @@ int ws2812_init(struct device* dev, int leds, void* buffer, ws2812_framebuf_t** 
     _alloc->anchor.reset2 = _alloc->anchor.pixels + leds;
   }
 
-  // the reset signal
+  // the reset signals
   memset(_alloc->anchor.reset, ws2812_bit_zero, sizeof(ws2812_color_t) * 4);
   memset(_alloc->anchor.reset2, ws2812_bit_zero, sizeof(ws2812_color_t) * 4);
 

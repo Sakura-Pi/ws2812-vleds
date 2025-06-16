@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
+// Copyright (c) 2025 Sakura Pi Org <kernel@sakurapi.org>
+
 #ifndef _WS2812_VLED_WS2812_H
 #define _WS2812_VLED_WS2812_H
 
@@ -17,22 +20,33 @@ typedef enum {
   // 0 code: high voltage 0.35us, low 0.8us
   // 1 code: high voltage 0.7us,  low 0.6us
 
-  // so right here, the low pulse (0) is defined to 0xc0
+  // ws2812_bit_low
   //   _
   //  | |______
   //  1100 0000
 
-  ws2812_bit_low = 0b11000000,
-
-  // and the high pulse (1) is defined to 0xf8
-  //   ____
-  //  |    |___
+  // ws2812_bit_high
+  //   _____
+  //  |     |__
   //  1111 1000
 
-  ws2812_bit_high = 0b11111000,
+  // ws2812_bit_zero
+  // for reset signal use
+  //
+  //  _________
+  //  0000 0000
 
-  // this is for reset use
-  ws2812_bit_zero = 0x00
+  // ws2812_bit_cali
+  // this option causes spi output a 50% width clk
+  // to help with the manually spi clk calibration
+  //  ___
+  // |   |____
+  // 1111 0000
+
+  ws2812_bit_low  = 0b11000000,
+  ws2812_bit_high = 0b11111000,
+  ws2812_bit_zero = 0b00000000,
+  ws2812_bit_cali = 0b11110000
 
 } ws2812_bit_t;
 
