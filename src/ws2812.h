@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // Copyright (c) 2025 Sakura Pi Org <kernel@sakurapi.org>
 
-#ifndef _WS2812_VLED_WS2812_H
-#define _WS2812_VLED_WS2812_H
+#ifndef _WS2812_H
+#define _WS2812_H
 
 #include <linux/types.h>
 
@@ -120,4 +120,4 @@ static int ws2812_calc_bufsize(int leds) {
   return sizeof(ws2812_color_t) * (8 + leds);
 }
 
-#endif /* _WS2812_VLED_WS2812_H */
+#endif /* _WS2812_H */
