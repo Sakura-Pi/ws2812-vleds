@@ -89,8 +89,6 @@ struct color24* dst, uint8_t lightness)
 static int __compare_set_brightness(struct led_classdev* led,
 enum led_brightness bright, enum filter_type filter)
 {
-  pr_info("wsled brightness set to %d\n", bright);
-
   struct driver_data* _drv_data = NULL; {
     _drv_data = (struct driver_data*)dev_get_drvdata(led->dev->parent);
     if(!_drv_data) {
