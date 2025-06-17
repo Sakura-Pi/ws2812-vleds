@@ -5,6 +5,8 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 
+#include "utils.h"
+
 /**
 * convert 8bits hex string into int8
 * @param c char
@@ -13,7 +15,9 @@ static uint8_t __hex2int8(const char* c)
 {
   uint8_t _value = 0;
   char _wrap[3] = {c[0], c[1], '\0'};
-  kstrtou8(_wrap, 16, &_value);
+  if(kstrtou8(_wrap, 16, &_value) != 0) {
+    return 0;
+  }
   return _value;
 }
 

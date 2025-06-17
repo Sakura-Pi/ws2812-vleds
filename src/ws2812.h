@@ -101,12 +101,14 @@ int ws2812_init(struct device* dev, int leds, void* buffer, ws2812_framebuf_t** 
 void ws2812_clear(ws2812_framebuf_t* frame, ws2812_color_t color);
 void ws2812_set_pixel(ws2812_framebuf_t* frame, int index, ws2812_color_t color);
 
-// #define ws2812_rgb(_r, _g, _b) \
-//   ((ws2812_color_t) { \
-//     .b = __inflate_ch(_b), \
-//     .g = __inflate_ch(_g), \
-//     .r = __inflate_ch(_r) \
-//   })
+/*
+  #define ws2812_rgb(_r, _g, _b) \
+    ((ws2812_color_t) { \
+      .b = __inflate_ch(_b), \
+      .g = __inflate_ch(_g), \
+      .r = __inflate_ch(_r) \
+    })
+*/
 
 static ws2812_color_t ws2812_rgb(uint8_t r, uint8_t g, uint8_t b) {
   return ((ws2812_color_t) {
@@ -116,8 +118,6 @@ static ws2812_color_t ws2812_rgb(uint8_t r, uint8_t g, uint8_t b) {
   });
 }
 
-static int ws2812_calc_bufsize(int leds) {
-  return sizeof(ws2812_color_t) * (8 + leds);
-}
+#define ws2812_calc_bufsize(leds) (sizeof(ws2812_color_t) * (8 + leds))
 
 #endif /* _WS2812_H */
