@@ -348,6 +348,12 @@ static void ws2812_vleds_remove(struct spi_device *spi) {
   struct wsled_data* _node, *_tmp;
 
   if (_drv_data) {
+
+    // clear leds
+    ws2812_clear(_drv_data->ws_opctx, ws2812_rgb(0, 0, 0)); {
+      ws2812_vleds_update(_drv_data);
+    }
+
     list_for_each_entry_safe(_node, _tmp, &_drv_data->leds, list) {
       if (_node->cls) {
         led_classdev_unregister(_node->cls);
