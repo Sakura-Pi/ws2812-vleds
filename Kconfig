@@ -3,5 +3,12 @@ config WS2812_VLEDS
 	default n
 	depends on LEDS_CLASS
 	help
-	  This option enables support for WS2812 LEDs,
-	  To compile this code as a module, choose M here.
+		This option enables support for WS2812 LEDs,
+		To compile this code as a module, choose M here.
+
+config WS2812_VLEDS_CHANNEL_CONTROL
+	bool "Create virtual color channel LEDs for WS2812"
+	depends on WS2812_VLEDS
+	default n
+	help
+		Enable the ability to control the main LED color through RGB 3-channel virtual LEDs.
