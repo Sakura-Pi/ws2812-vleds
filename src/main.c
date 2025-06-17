@@ -56,10 +56,19 @@ struct wsled_data {
   struct led_classdev* cls_red;      // red channel LED device
   struct led_classdev* cls_green;    // green channel LED device
   struct led_classdev* cls_blue;     // blue channel LED device
-  struct color24 color;
-  struct color24 origin_color;
+  struct color24 color;              // calculated color
+  struct color24 origin_color;       // origin color is readonly
   uint8_t lightness; // for HSL color space
 };
+
+enum filter_type {
+  filter_main = 0,
+  filter_red_ch,
+  filter_green_ch,
+  filter_blue_ch,
+};
+
+static int ws2812_vleds_update(struct driver_data* drv);
 
 static void __set_lightness_color24(struct color24* src,
 struct color24* dst, uint8_t lightness)
@@ -75,6 +84,88 @@ struct color24* dst, uint8_t lightness)
 
   // convert back to rgb
   hsl_to_rgb(h, s, l, &dst->r, &dst->g, &dst->b);
+}
+
+static int __compare_set_brightness(struct led_classdev* led,
+enum led_brightness bright, enum filter_type filter)
+{
+  pr_info("wsled brightness set to %d\n", bright);
+
+  struct driver_data* _drv_data = NULL; {
+    _drv_data = (struct driver_data*)dev_get_drvdata(led->dev->parent);
+    if(!_drv_data) {
+      pr_info("failed to get drv context\n");
+      return -ENODEV;
+    }
+  }
+
+  int _index = 0, _ret = 0;
+  struct wsled_data* _node = NULL;
+
+  #define search_set_wsled_channel(cls, _do) \
+    _index = 0; \
+    list_for_each_entry(_node, &_drv_data->leds, list) { \
+      if(_node->cls == led) _do \
+      ++_index; \
+    }
+
+  switch(filter) {
+    case filter_red_ch:
+      search_set_wsled_channel(cls_red, {
+        _node->color.r = bright;
+        break;
+      });
+      break;
+    case filter_green_ch:
+      search_set_wsled_channel(cls_green, {
+        _node->color.g = bright;
+        break;
+      });
+      break;
+    case filter_blue_ch:
+      search_set_wsled_channel(cls_blue, {
+        _node->color.b = bright;
+        break;
+      });
+      break;
+    case filter_main:
+      list_for_each_entry(_node, &_drv_data->leds, list) {
+        if(_node->cls == led) {
+          _node->lightness = bright;
+          __set_lightness_color24(&_node->origin_color, &_node->color, _node->lightness);
+          break;
+        }
+      }
+      break;
+  }
+
+  // update leds
+  ws2812_set_pixel(_drv_data->ws_opctx, _index,
+    ws2812_rgb(_node->color.r, _node->color.g, _node->color.b)); {
+    _ret = ws2812_vleds_update(_drv_data);
+  }
+
+  return _ret;
+}
+
+static int __cb_set_wsled_red(struct led_classdev* led, enum led_brightness bright)
+{
+  return __compare_set_brightness(led, bright, filter_red_ch);
+}
+
+static int __cb_set_wsled_green(struct led_classdev* led, enum led_brightness bright)
+{
+  return __compare_set_brightness(led, bright, filter_green_ch);
+}
+
+static int __cb_set_wsled_blue(struct led_classdev* led, enum led_brightness bright)
+{
+  return __compare_set_brightness(led, bright, filter_blue_ch);
+}
+
+static int __cb_set_wsled(struct led_classdev* led, enum led_brightness bright)
+{
+  return __compare_set_brightness(led, bright, filter_main);
 }
 
 static int ws2812_vleds_get_lednum(struct device_node* node) {
@@ -95,157 +186,6 @@ static int ws2812_vleds_update(struct driver_data* drv) {
   mutex_lock(&drv->mutex);
   _ret = spi_write(drv->spi, drv->tx_buffer.ptr, drv->tx_buffer.length);
   mutex_unlock(&drv->mutex);
-
-  return _ret;
-}
-
-static int ws2812_vleds_set_brightness(struct led_classdev* led, enum led_brightness bright)
-{
-  pr_info("wsled brightness set to %d\n", bright);
-
-  struct driver_data* _drv_data = NULL; {
-    _drv_data = (struct driver_data*)dev_get_drvdata(led->dev->parent);
-    if(!_drv_data) {
-      pr_info("failed to get drv context\n");
-      return -ENODEV;
-    }
-  }
-
-  int _index = 0, _ret = 0;
-  struct wsled_data* _node;
-
-  list_for_each_entry(_node, &_drv_data->leds, list) {
-
-    // set brightness
-    if(_node->cls == led) {
-      pr_info("set wsled %p to %d\n", _node->cls, bright);
-
-      _node->lightness = bright;
-      __set_lightness_color24(&_node->origin_color, &_node->color, _node->lightness);
-      dev_info(led->dev, "set brightness %d: r%d g%d b%d \n", bright, _node->color.r, _node->color.g, _node->color.b);
-
-      ws2812_set_pixel(_drv_data->ws_opctx, _index, ws2812_rgb(
-        _node->color.r,
-        _node->color.g,
-        _node->color.b)); {
-        _ret = ws2812_vleds_update(_drv_data);
-        break;
-      }
-    }
-
-    ++_index;
-  }
-
-  return _ret;
-}
-
-static int ws2812_vleds_set_red(struct led_classdev* led, enum led_brightness bright)
-{
-  pr_info("wsled red set to %d\n", bright);
-
-  struct driver_data* _drv_data = NULL; {
-    _drv_data = (struct driver_data*)dev_get_drvdata(led->dev->parent);
-    if(!_drv_data) {
-      pr_info("failed to get drv context\n");
-      return -ENODEV;
-    }
-  }
-
-  int _index = 0, _ret = 0;
-  struct wsled_data* _node;
-
-  list_for_each_entry(_node, &_drv_data->leds, list) {
-    if(_node->cls_red == led) {
-      pr_info("set wsled red %p to %d\n", _node->cls_red, bright);
-
-      _node->color.r = bright;
-      _node->origin_color.r = bright;
-      pr_info("set red r%d g%d b%d \n",_node->color.r, _node->color.g, _node->color.b);
-
-      ws2812_set_pixel(_drv_data->ws_opctx, _index, ws2812_rgb(
-        _node->color.r,
-        _node->color.g,
-        _node->color.b)); {
-        _ret = ws2812_vleds_update(_drv_data);
-        break;
-      }
-    }
-    ++_index;
-  }
-
-  return _ret;
-}
-
-static int ws2812_vleds_set_green(struct led_classdev* led, enum led_brightness bright)
-{
-  pr_info("wsled green set to %d\n", bright);
-
-  struct driver_data* _drv_data = NULL; {
-    _drv_data = (struct driver_data*)dev_get_drvdata(led->dev->parent);
-    if(!_drv_data) {
-      pr_info("failed to get drv context\n");
-      return -ENODEV;
-    }
-  }
-
-  int _index = 0, _ret = 0;
-  struct wsled_data* _node;
-
-  list_for_each_entry(_node, &_drv_data->leds, list) {
-    if(_node->cls_green == led) {
-      pr_info("set wsled green %p to %d\n", _node->cls_green, bright);
-
-      _node->color.g = bright;
-      _node->origin_color.g = bright;
-      pr_info("set green r%d g%d b%d \n",_node->color.r, _node->color.g, _node->color.b);
-
-      ws2812_set_pixel(_drv_data->ws_opctx, _index, ws2812_rgb(
-        _node->color.r,
-        _node->color.g,
-        _node->color.b)); {
-        _ret = ws2812_vleds_update(_drv_data);
-        break;
-      }
-    }
-    ++_index;
-  }
-
-  return _ret;
-}
-
-static int ws2812_vleds_set_blue(struct led_classdev* led, enum led_brightness bright)
-{
-  pr_info("wsled blue set to %d\n", bright);
-
-  struct driver_data* _drv_data = NULL; {
-    _drv_data = (struct driver_data*)dev_get_drvdata(led->dev->parent);
-    if(!_drv_data) {
-      pr_info("failed to get drv context\n");
-      return -ENODEV;
-    }
-  }
-
-  int _index = 0, _ret = 0;
-  struct wsled_data* _node;
-
-  list_for_each_entry(_node, &_drv_data->leds, list) {
-    if(_node->cls_blue == led) {
-      pr_info("set wsled blue %p to %d\n", _node->cls_blue, bright);
-
-      _node->color.b = bright;
-      _node->origin_color.b = bright;
-      pr_info("set blue r%d g%d b%d \n",_node->color.r, _node->color.g, _node->color.b);
-
-      ws2812_set_pixel(_drv_data->ws_opctx, _index, ws2812_rgb(
-        _node->color.r,
-        _node->color.g,
-        _node->color.b)); {
-        _ret = ws2812_vleds_update(_drv_data);
-        break;
-      }
-    }
-    ++_index;
-  }
 
   return _ret;
 }
@@ -319,7 +259,7 @@ static int ws2812_vleds_probe(struct spi_device *spi)
     }
 
     _ledcls->name = _label;
-    _ledcls->brightness_set_blocking = ws2812_vleds_set_brightness;
+    _ledcls->brightness_set_blocking = __cb_set_wsled;
     _ledcls->max_brightness = _max_brightness;
     _ledcls->dev = &spi->dev;
 
@@ -346,19 +286,19 @@ static int ws2812_vleds_probe(struct spi_device *spi)
 
     // Setup red channel LED
     _ledcls_red->name = _red_name;
-    _ledcls_red->brightness_set_blocking = ws2812_vleds_set_red;
+    _ledcls_red->brightness_set_blocking = __cb_set_wsled_red;
     _ledcls_red->max_brightness = 255;
     _ledcls_red->dev = &spi->dev;
 
     // Setup green channel LED
     _ledcls_green->name = _green_name;
-    _ledcls_green->brightness_set_blocking = ws2812_vleds_set_green;
+    _ledcls_green->brightness_set_blocking = __cb_set_wsled_green;
     _ledcls_green->max_brightness = 255;
     _ledcls_green->dev = &spi->dev;
 
     // Setup blue channel LED
     _ledcls_blue->name = _blue_name;
-    _ledcls_blue->brightness_set_blocking = ws2812_vleds_set_blue;
+    _ledcls_blue->brightness_set_blocking = __cb_set_wsled_blue;
     _ledcls_blue->max_brightness = 255;
     _ledcls_blue->dev = &spi->dev;
 
@@ -392,7 +332,7 @@ static int ws2812_vleds_probe(struct spi_device *spi)
       _ledctx->lightness = 0;
       __set_lightness_color24(&_ledctx->origin_color, &_ledctx->color, _ledctx->lightness);
 
-      // Set initial brightness values for RGB sub-devices
+      // set initial brightness values for RGB sub-devices
       _ledcls_red->brightness = _color_r;
       _ledcls_green->brightness = _color_g;
       _ledcls_blue->brightness = _color_b;
@@ -433,11 +373,11 @@ static void ws2812_vleds_remove(struct spi_device *spi) {
     }
   }
 
-  pr_info("Virtual LEDs removed for %s\n", dev_name(&spi->dev));
+  pr_info("virtual leds removed for %s\n", dev_name(&spi->dev));
 }
 
 static const struct of_device_id match_table[] = {
-  { "ws2812-vleds", 0 },
+  { .compatible = "ws2812-vleds" },
   { /* end */ }
 };
 MODULE_DEVICE_TABLE(of, match_table);
