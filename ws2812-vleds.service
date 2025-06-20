@@ -1,0 +1,18 @@
+[Unit]
+Description=LED Marquee Effect Service
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/bin/bash /usr/local/sbin/ws2812-vleds-demo.sh
+Restart=on-failure
+RestartSec=5s
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=ws2812-vleds-demo
+
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target
